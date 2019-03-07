@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Henry's Library</title>
+</head>
+
+<h2>Henry's Library</h2>
+<br>
+<table border="1">
+  <tr>
+    <th>Title</th>
+    <th>Author</th>
+    <th>Pages</th>
+  </tr>
+  {{range .}}
+  <tr>
+    <td>{{.Title}}</td>
+    <td>{{.Author}}</td>
+    <td>{{.Length}}</td>
+  </tr>
+  {{end}}
+</table>
