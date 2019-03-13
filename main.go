@@ -13,6 +13,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type BookDB struct {
+	db *storm.DB
+}
+
 // Book is a struct!
 type Book struct {
 	Pk           int    `storm:"id,increment"`
@@ -35,11 +39,13 @@ var IDCounter = len(Books)
 func main() {
 	dbFile := "test.db"
 	err := os.Remove(dbFile)
-	db, err := storm.Open(dbFile)
+
+	var bookDB BookDB
+	bookDB.db, err = storm.Open(dbFile)
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer db.Close()
+	defer bookDB.db.Close()
 
 	// ------- (Temporary) DB Testing Start ------- //
 	// https://github.com/asdine/storm#fetch-all-objects
@@ -47,12 +53,12 @@ func main() {
 	// https://zupzup.org/boltdb-with-storm/
 
 	// Add sample data to BoltDB
-	sampleData(db)
+	bookDB.fillSampleData()
 
 	// Get sample DB entry
 	var books []Book
 	// err = db.All(&books, storm.Limit(1), storm.Reverse())
-	err = db.All(&books, storm.Reverse())
+	err = bookDB.db.All(&books, storm.Reverse())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,108 +66,81 @@ func main() {
 
 	// Testing out update and delete
 	var book3 Book
-	err = db.One("Title", "Dictionary", &book3)
+	err = bookDB.db.One("Title", "Dictionary", &book3)
 	fmt.Println("----------------")
 	tempInt := book3.Pk
-	_ = db.UpdateField(&Book{Pk: tempInt}, "Author", "Bob")
-	err = db.All(&books, storm.Reverse())
+	_ = bookDB.db.UpdateField(&Book{Pk: tempInt}, "Author", "Bob")
+	err = bookDB.db.All(&books, storm.Reverse())
 	fmt.Println(books)
 	fmt.Println("----------------")
-	err = db.One("Title", "Cat in the Hat", &book3)
-	err = db.DeleteStruct(&book3)
-	err = db.All(&books, storm.Reverse())
+	err = bookDB.db.One("Title", "Cat in the Hat", &book3)
+	err = bookDB.db.DeleteStruct(&book3)
+	err = bookDB.db.All(&books, storm.Reverse())
 	fmt.Println(books)
 
 	// ------- (Temporary) DB Testing End ------- //
 
 	// gorilla/mux router and routes
 	r := mux.NewRouter()
-	r.HandleFunc("/confirmation", confirmation)
-	r.HandleFunc("/addbook", addBookGet).Methods("GET")
-	r.HandleFunc("/addbook", addBookPost).Methods("POST")
-	r.HandleFunc("/deletebook/{id:[0-9]+}", deleteBook).Methods("GET")
-	r.HandleFunc("/", listBooks)
+	r.HandleFunc("/addbook", bookDB.addBookGet).Methods("GET")
+	r.HandleFunc("/addbook", bookDB.addBookPost).Methods("POST")
+	r.HandleFunc("/deletebook/{id:[0-9]+}", bookDB.deleteBook).Methods("GET")
+	r.HandleFunc("/", bookDB.listBooks)
 	http.Handle("/", r)
 
 	log.Println("Listening...")
 	http.ListenAndServe(":3000", r)
 }
 
-func sampleData(db *storm.DB) {
-
+func (bookDB *BookDB) fillSampleData() {
 	bookList := [][]string{
 		{"Where the Wild Things Are", "Maurice Sendak"},
 		{"Cat in the Hat", "Doctor Seuss"},
+		{"On the Road", "Jack Kerouac"},
 		{"Dictionary", "Steve"},
 		{"Quicksilver", "Neil Stephenson"},
 	}
 	for _, elem := range bookList {
-		_ = addBook(db, elem[0], elem[1])
+		_ = bookDB.addBook(elem[0], elem[1])
 	}
 }
 
-func addBook(db *storm.DB, title string, author string) error {
+func (bookDB *BookDB) addBook(title string, author string) error {
 	book := Book{Title: title, Author: author, DateAdded: time.Now().Add(-10 * time.Minute), DateModified: time.Now()}
-	err := db.Save(&book)
+	err := bookDB.db.Save(&book)
 	if err != nil {
 		return fmt.Errorf("could not save book, %v", err)
 	}
 	return nil
 }
 
-func listBooks(w http.ResponseWriter, r *http.Request) {
-	render(w, "templates/index.html", Books)
+func (bookDB *BookDB) listBooks(w http.ResponseWriter, r *http.Request) {
+	var books []Book
+	err := bookDB.db.All(&books)
+	if err != nil {
+		fmt.Println(fmt.Errorf("could not fetch books, %v", err))
+	}
+	render(w, "templates/index.html", books)
 }
 
-func addBookGet(w http.ResponseWriter, r *http.Request) {
+func (bookDB *BookDB) addBookGet(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/addbook.html", nil)
 }
 
-func addBookPost(w http.ResponseWriter, r *http.Request) {
-	log.Println("Submitted...")
-	IDCounter++
-	// bookLength, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("length")))
-
-	msg := &Book{
-		Pk:           IDCounter,
-		Title:        r.FormValue("title"),
-		Author:       r.FormValue("author"),
-		DateAdded:    time.Now(),
-		DateModified: time.Now(),
-	}
-
-	Books = append(Books, *msg)
-
-	log.Println(msg)
-
+func (bookDB *BookDB) addBookPost(w http.ResponseWriter, r *http.Request) {
+	_ = bookDB.addBook(r.FormValue("title"), r.FormValue("author"))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func deleteBook(w http.ResponseWriter, r *http.Request) {
-
+func (bookDB *BookDB) deleteBook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	// w.WriteHeader(http.StatusOK)
-	fmt.Println(vars["id"])
 	id, _ := strconv.Atoi(vars["id"])
 
-	for i := 0; i < len(Books); i++ {
-		// Iterate through Book objects and remove Book if ID matches deleted ID
-		if id == Books[i].Pk {
-			if i < len(Books)-1 {
-				Books = append(Books[:i], Books[i+1:]...)
-				break
-			} else {
-				Books = Books[:i]
-				break
-			}
-		}
-	}
+	var delBook Book
+	_ = bookDB.db.One("Pk", id, &delBook)
+	_ = bookDB.db.DeleteStruct(&delBook)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-func confirmation(w http.ResponseWriter, r *http.Request) {
-	render(w, "templates/confirmation.html", nil)
 }
 
 func render(w http.ResponseWriter, filename string, data interface{}) {
