@@ -13,13 +13,13 @@
   <tr>
     <th>Title</th>
     <th>Author</th>
-    <th>Pages</th>
+    <th>Date Added</th>
   </tr>
   {{range .}}
   <tr>
     <td>{{.Title}}</td>
     <td>{{.Author}}</td>
-    <td>{{.Length}}</td>
+    <td>{{.DateAdded.Format "02 Jan 2006"}}</td>
     <td><a href="/deletebook/{{.ID}}">delete</a></td>
   </tr>
   {{end}}
