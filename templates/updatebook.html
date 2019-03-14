@@ -1,0 +1,18 @@
+<h1>New Book</h1>
+<form action="/updatebook" method="POST" novalidate>
+  <div>
+    <label>ID:</label>
+    <input name="id" value="{{ .Pk }}" readonly></input>
+  </div>
+  <div>
+    <label>Title:</label>
+    <input name="title" value="{{ .Title }}"></input>
+  </div>
+  <div>
+    <label>Author:</label>
+    <input name="author" value="{{ .Author }}"></input>
+  </div>
+  <div>
+    <input type="submit" value="Update Book">
+  </div>
+</form>

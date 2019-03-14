@@ -13,11 +13,13 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// BookDB is a wrapper around a storm.DB instance to allow
+// access to DB in HTTP handlers
 type BookDB struct {
 	db *storm.DB
 }
 
-// Book is a struct!
+// Book is a representation of a book object with database storage in mind
 type Book struct {
 	Pk           int    `storm:"id,increment"`
 	Title        string `storm:"unique"`
@@ -26,19 +28,9 @@ type Book struct {
 	DateModified time.Time
 }
 
-// Books is a Global variable!  It will go away when we add a database.
-var Books = []Book{
-	{1, "Where the Wild Things Are", "Maurice Sendak", time.Now(), time.Now()},
-	{2, "Cat in the Hat", "Doctor Seuss", time.Now(), time.Now()},
-	{3, "Dictionary", "Steve", time.Now(), time.Now()},
-	{4, "Quicksiver", "Neil Stevenson", time.Now(), time.Now()},
-}
-
-var IDCounter = len(Books)
-
 func main() {
 	dbFile := "test.db"
-	err := os.Remove(dbFile)
+	err := os.Remove(dbFile) // Clear out old test db file
 
 	var bookDB BookDB
 	bookDB.db, err = storm.Open(dbFile)
@@ -47,43 +39,15 @@ func main() {
 	}
 	defer bookDB.db.Close()
 
-	// ------- (Temporary) DB Testing Start ------- //
-	// https://github.com/asdine/storm#fetch-all-objects
-	// https://godoc.org/github.com/asdine/storm#Query
-	// https://zupzup.org/boltdb-with-storm/
-
 	// Add sample data to BoltDB
 	bookDB.fillSampleData()
-
-	// Get sample DB entry
-	var books []Book
-	// err = db.All(&books, storm.Limit(1), storm.Reverse())
-	err = bookDB.db.All(&books, storm.Reverse())
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(books)
-
-	// Testing out update and delete
-	var book3 Book
-	err = bookDB.db.One("Title", "Dictionary", &book3)
-	fmt.Println("----------------")
-	tempInt := book3.Pk
-	_ = bookDB.db.UpdateField(&Book{Pk: tempInt}, "Author", "Bob")
-	err = bookDB.db.All(&books, storm.Reverse())
-	fmt.Println(books)
-	fmt.Println("----------------")
-	err = bookDB.db.One("Title", "Cat in the Hat", &book3)
-	err = bookDB.db.DeleteStruct(&book3)
-	err = bookDB.db.All(&books, storm.Reverse())
-	fmt.Println(books)
-
-	// ------- (Temporary) DB Testing End ------- //
 
 	// gorilla/mux router and routes
 	r := mux.NewRouter()
 	r.HandleFunc("/addbook", bookDB.addBookGet).Methods("GET")
 	r.HandleFunc("/addbook", bookDB.addBookPost).Methods("POST")
+	r.HandleFunc("/updatebook/{id:[0-9]+}", bookDB.updateBookGet).Methods("GET")
+	r.HandleFunc("/updatebook", bookDB.updateBookPost).Methods("POST")
 	r.HandleFunc("/deletebook/{id:[0-9]+}", bookDB.deleteBook).Methods("GET")
 	r.HandleFunc("/", bookDB.listBooks)
 	http.Handle("/", r)
@@ -103,6 +67,37 @@ func (bookDB *BookDB) fillSampleData() {
 	for _, elem := range bookList {
 		_ = bookDB.addBook(elem[0], elem[1])
 	}
+
+	// ------- (Temporary) DB Testing Start ------- //
+	// https://github.com/asdine/storm#fetch-all-objects
+	// https://godoc.org/github.com/asdine/storm#Query
+	// https://zupzup.org/boltdb-with-storm/
+	// https://github.com/zupzup/boltdb-storm-example/blob/master/main.go
+
+	// Get sample DB entry
+	var books []Book
+	// err = db.All(&books, storm.Limit(1), storm.Reverse())
+	err := bookDB.db.All(&books, storm.Reverse())
+	if err != nil {
+		log.Fatal(err)
+	}
+	// fmt.Println(books)
+
+	// Testing out update and delete
+	var book3 Book
+	err = bookDB.db.One("Title", "Dictionary", &book3)
+	// fmt.Println("----------------")
+	tempInt := book3.Pk
+	_ = bookDB.db.UpdateField(&Book{Pk: tempInt}, "Author", "Bob")
+	err = bookDB.db.All(&books, storm.Reverse())
+	// fmt.Println(books)
+	// fmt.Println("----------------")
+	err = bookDB.db.One("Title", "Cat in the Hat", &book3)
+	err = bookDB.db.DeleteStruct(&book3)
+	err = bookDB.db.All(&books, storm.Reverse())
+	// fmt.Println(books)
+
+	// ------- (Temporary) DB Testing End ------- //
 }
 
 func (bookDB *BookDB) addBook(title string, author string) error {
@@ -140,6 +135,21 @@ func (bookDB *BookDB) deleteBook(w http.ResponseWriter, r *http.Request) {
 	_ = bookDB.db.One("Pk", id, &delBook)
 	_ = bookDB.db.DeleteStruct(&delBook)
 
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+func (bookDB *BookDB) updateBookGet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
+
+	var upBook Book
+	_ = bookDB.db.One("Pk", id, &upBook)
+	render(w, "templates/updatebook.html", upBook)
+}
+
+func (bookDB *BookDB) updateBookPost(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(r.FormValue("id"))
+
+	_ = bookDB.db.Update(&Book{Pk: id, Title: r.FormValue("title"), Author: r.FormValue("author"), DateModified: time.Now()})
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

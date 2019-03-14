@@ -20,6 +20,7 @@
     <td>{{.Title}}</td>
     <td>{{.Author}}</td>
     <td>{{.DateAdded.Format "02 Jan 2006"}}</td>
+    <td><a href="/updatebook/{{.Pk}}">update</a></td>
     <td><a href="/deletebook/{{.Pk}}">delete</a></td>
   </tr>
   {{end}}
