@@ -1,100 +1,197 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
-	"strings"
+	"time"
 
+	"github.com/asdine/storm"
 	"github.com/gorilla/mux"
 )
 
-// Book is a struct!
+// BookDB is a wrapper around a storm.DB instance to allow
+// access to DB in HTTP handlers
+type BookDB struct {
+	db *storm.DB
+}
+
+// Book is a representation of a book object with database storage in mind
 type Book struct {
-	ID     int
-	Title  string
-	Author string
-	Length int
+	Pk           int    `storm:"id,increment"`
+	Title        string `storm:"unique"`
+	Author       string `storm:"index"`
+	DateAdded    time.Time
+	DateModified time.Time
 }
 
-// Books is a Global variable!  It will go away when we add a database.
-var Books = []Book{
-	{1, "Where the Wild Things Are", "Maurice Sendak", 45},
-	{2, "Cat in the Hat", "Doctor Seuss", 33},
-	{3, "Dictionary", "Steve", 666},
-	{4, "Quicksiver", "Neil Stevenson", 100005},
+// Simplified Book struct for JSON post
+type BookSimp struct {
+	Title  string `json:"title"`
+	Author string `json:"author"`
 }
-
-var IDCounter = len(Books)
 
 func main() {
-	r := mux.NewRouter()
+	dbFile := "test.db"
+	err := os.Remove(dbFile) // Clear out old test db file
 
-	r.HandleFunc("/confirmation", confirmation)
-	r.HandleFunc("/addbook", addBookGet).Methods("GET")
-	r.HandleFunc("/addbook", addBookPost).Methods("POST")
-	r.HandleFunc("/deletebook/{id:[0-9]+}", deleteBook).Methods("GET")
-	r.HandleFunc("/", listBooks)
+	var bookDB BookDB
+	bookDB.db, err = storm.Open(dbFile, storm.Batch())
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer bookDB.db.Close()
+
+	// Add sample data to BoltDB
+	bookDB.fillSampleData()
+
+	// gorilla/mux router and routes
+	r := mux.NewRouter()
+	r.HandleFunc("/addbook", bookDB.addBookGet).Methods("GET")
+	r.HandleFunc("/addbook", bookDB.addBookPost).Methods("POST")
+	r.HandleFunc("/updatebook/{id:[0-9]+}", bookDB.updateBookGet).Methods("GET")
+	r.HandleFunc("/updatebook", bookDB.updateBookPost).Methods("POST")
+	r.HandleFunc("/deletebook/{id:[0-9]+}", bookDB.deleteBook).Methods("GET")
+	r.HandleFunc("/api/v1/list", bookDB.listBooksJSON).Methods("GET")
+	r.HandleFunc("/api/v1/addbook", bookDB.addBooksJSON).Methods("POST")
+	r.HandleFunc("/", bookDB.listBooks).Methods("GET")
 	http.Handle("/", r)
 
 	log.Println("Listening...")
 	http.ListenAndServe(":3000", r)
 }
 
-func listBooks(w http.ResponseWriter, r *http.Request) {
-	render(w, "templates/index.html", Books)
+func (bookDB *BookDB) fillSampleData() {
+	bookList := [][]string{
+		{"Where the Wild Things Are", "Maurice Sendak"},
+		{"Cat in the Hat", "Doctor Seuss"},
+		{"On the Road", "Jack Kerouac"},
+		{"Dictionary", "Steve"},
+		{"Quicksilver", "Neil Stephenson"},
+	}
+	for _, elem := range bookList {
+		_ = bookDB.addBook(elem[0], elem[1])
+	}
+
+	// ------- (Temporary) DB Testing Start ------- //
+	// https://github.com/asdine/storm#fetch-all-objects
+	// https://godoc.org/github.com/asdine/storm#Query
+	// https://zupzup.org/boltdb-with-storm/
+	// https://github.com/zupzup/boltdb-storm-example/blob/master/main.go
+
+	// Get sample DB entry
+	var books []Book
+	// err = db.All(&books, storm.Limit(1), storm.Reverse())
+	err := bookDB.db.All(&books, storm.Reverse())
+	if err != nil {
+		log.Fatal(err)
+	}
+	// fmt.Println(books)
+
+	// Testing out update and delete
+	var book3 Book
+	err = bookDB.db.One("Title", "Dictionary", &book3)
+	// fmt.Println("----------------")
+	tempInt := book3.Pk
+	_ = bookDB.db.UpdateField(&Book{Pk: tempInt}, "Author", "Bob")
+	err = bookDB.db.All(&books, storm.Reverse())
+	// fmt.Println(books)
+	// fmt.Println("----------------")
+	err = bookDB.db.One("Title", "Cat in the Hat", &book3)
+	err = bookDB.db.DeleteStruct(&book3)
+	err = bookDB.db.All(&books, storm.Reverse())
+	// fmt.Println(books)
+
+	// ------- (Temporary) DB Testing End ------- //
 }
 
-func addBookGet(w http.ResponseWriter, r *http.Request) {
+func (bookDB *BookDB) addBook(title string, author string) error {
+	book := Book{Title: title, Author: author, DateAdded: time.Now(), DateModified: time.Now()}
+	err := bookDB.db.Save(&book)
+	if err != nil {
+		return fmt.Errorf("could not save book, %v", err)
+	}
+	return nil
+}
+
+func (bookDB *BookDB) listBooks(w http.ResponseWriter, r *http.Request) {
+	var books []Book
+	err := bookDB.db.All(&books)
+	if err != nil {
+		fmt.Println(fmt.Errorf("could not fetch books, %v", err))
+	}
+	render(w, "templates/index.html", books)
+}
+
+func (bookDB *BookDB) listBooksJSON(w http.ResponseWriter, r *http.Request) {
+	var books []Book
+	err := bookDB.db.All(&books)
+	if err != nil {
+		fmt.Println(fmt.Errorf("could not fetch books, %v", err))
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(books)
+}
+
+func (bookDB *BookDB) addBookGet(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/addbook.html", nil)
 }
 
-func addBookPost(w http.ResponseWriter, r *http.Request) {
-	log.Println("Submitted...")
-	IDCounter++
-	bookLength, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("length")))
-
-	msg := &Book{
-		ID:     IDCounter,
-		Title:  r.FormValue("title"),
-		Author: r.FormValue("author"),
-		Length: bookLength,
-	}
-
-	Books = append(Books, *msg)
-
-	log.Println(msg)
-
+func (bookDB *BookDB) addBookPost(w http.ResponseWriter, r *http.Request) {
+	_ = bookDB.addBook(r.FormValue("title"), r.FormValue("author"))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func deleteBook(w http.ResponseWriter, r *http.Request) {
-
-	vars := mux.Vars(r)
-	// w.WriteHeader(http.StatusOK)
-	fmt.Println(vars["id"])
-	id, _ := strconv.Atoi(vars["id"])
-
-	for i := 0; i < len(Books); i++ {
-		// Iterate through Book objects and remove Book if ID matches deleted ID
-		if id == Books[i].ID {
-			if i < len(Books)-1 {
-				Books = append(Books[:i], Books[i+1:]...)
-				break
-			} else {
-				Books = Books[:i]
+func (bookDB *BookDB) addBooksJSON(w http.ResponseWriter, r *http.Request) {
+	var booksSimp []BookSimp
+	err := json.NewDecoder(r.Body).Decode(&booksSimp)
+	if err != nil {
+		println("whoops!  json decode failure.")
+		errorz := struct {
+			Error string `json:"error"`
+		}{
+			"failed to decode",
+		}
+		json.NewEncoder(w).Encode(errorz)
+	} else {
+		for _, elem := range booksSimp {
+			err = bookDB.addBook(elem.Title, elem.Author)
+			if err != nil {
+				log.Println(err)
 				break
 			}
 		}
 	}
+}
+
+func (bookDB *BookDB) deleteBook(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
+
+	var delBook Book
+	_ = bookDB.db.One("Pk", id, &delBook)
+	_ = bookDB.db.DeleteStruct(&delBook)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
+func (bookDB *BookDB) updateBookGet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
 
-func confirmation(w http.ResponseWriter, r *http.Request) {
-	render(w, "templates/confirmation.html", nil)
+	var upBook Book
+	_ = bookDB.db.One("Pk", id, &upBook)
+	render(w, "templates/updatebook.html", upBook)
+}
+
+func (bookDB *BookDB) updateBookPost(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(r.FormValue("id"))
+
+	_ = bookDB.db.Update(&Book{Pk: id, Title: r.FormValue("title"), Author: r.FormValue("author"), DateModified: time.Now()})
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func render(w http.ResponseWriter, filename string, data interface{}) {
