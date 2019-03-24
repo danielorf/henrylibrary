@@ -1,4 +1,8 @@
+<style type="text/css">.error {color: red;}</style>
 <h1>New Book</h1>
+{{ with .Error }}
+<p class="error">{{ . }}</p>
+{{ end }}
 <form action="/addbook" method="POST" novalidate>
   <div>
     <label>Title:</label>
@@ -7,6 +11,14 @@
   <div>
     <label>Author:</label>
     <input name="author"></input>
+  </div>
+  <div>
+    <label>Binding:</label>
+    <input name="binding"></input>
+  </div>
+  <div>
+    <label>Source:</label>
+    <input name="source"></input>
   </div>
   <div>
     <input type="submit" value="Add Book">
