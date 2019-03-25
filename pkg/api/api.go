@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/asdine/storm"
-	"github.com/danielorf/henry_library/book"
+	"github.com/danielorf/henry_library/pkg/book"
 	"github.com/gorilla/mux"
 )
 
@@ -23,15 +23,13 @@ type App struct {
 }
 
 func (a *App) Initialize(dbname string) {
-	// dbFile := "test.db"
 	err := os.Remove(dbname) // Clear out old test db file
 
 	a.DB, err = storm.Open(dbname, storm.Batch())
 	if err != nil {
 		fmt.Println(err)
-		fmt.Println("yoyoyoy")
 	}
-	// defer a.DB.Close()
+	// defer a.DB.Close()  Moved to Run()
 
 	a.Router = mux.NewRouter()
 	a.initializeRoutes()
@@ -50,6 +48,7 @@ func (a *App) initializeRoutes() {
 
 func (a *App) Run(addr string) {
 	defer a.DB.Close()
+	log.Println("Listening...")
 	log.Fatal(http.ListenAndServe(addr, a.Router))
 }
 
