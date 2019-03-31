@@ -173,11 +173,11 @@ func render(w http.ResponseWriter, filename string, data interface{}) {
 
 func (a *App) FillSampleData() {
 	bookList := [][]string{
-		{"Where the Wild Things Are", "Maurice Sendak", "", ""},
-		{"Cat in the Hat", "Doctor Seuss", "", ""},
-		{"On the Road", "Jack Kerouac", "", ""},
-		{"Dictionary", "Steve", "", ""},
-		{"Quicksilver", "Neil Stephenson", "", ""},
+		{"Where the Wild Things Are", "Maurice Sendak", "boardback", "G&G"},
+		{"Cat in the Hat", "Doctor Seuss", "paperback", "Santa"},
+		{"On the Road", "Jack Kerouac", "paperback", "A time traveller"},
+		{"Dictionary", "Steve", "hardback", "Library"},
+		{"Quicksilver", "Neil Stephenson", "paperback", "Different time traveller"},
 	}
 	for _, elem := range bookList {
 		_ = a.addBook(elem[0], elem[1], elem[2], elem[3])
