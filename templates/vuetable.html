@@ -1,0 +1,43 @@
+<html>
+
+<head>
+    <title>Henry's Library</title>
+    <link rel="stylesheet" href="https://unpkg.com/vue-good-table@2.0.0-alpha.1/dist/vue-good-table.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.2/vue.js"></script>
+    <script src="https://unpkg.com/vue-good-table@2.16.3/dist/vue-good-table.js"></script>
+</head>
+
+<body>
+
+    <div id="app">
+        <vue-good-table :rows="rows" :columns="columns" :search-options="{ enabled: true }" :pagination-options="{
+            enabled: true,
+            perPage: 10
+        }">
+        </vue-good-table>
+    </div>
+
+    <script>
+        new Vue({
+            el: "#app",
+            mounted() {
+                fetch('http://localhost:3000/api/v1/list')
+                    .then(res => res.json())
+                    .then(json => {
+                        this.rows = json;
+                    });
+            },
+            data: () => ({
+                columns: [
+                    { label: 'Titlez', field: 'Title' },
+                    { label: 'Author', field: 'Author' },
+                    { label: 'Binding', field: 'Binding' },
+                    { label: 'Source', field: 'Source' },
+                ],
+                rows: []
+            }),
+        });
+    </script>
+</body>
+
+</html>

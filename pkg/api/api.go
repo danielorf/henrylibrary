@@ -43,6 +43,7 @@ func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/deletebook/{id:[0-9]+}", a.DeleteBook).Methods("GET")
 	a.Router.HandleFunc("/api/v1/list", a.ListBooksJSON).Methods("GET")
 	a.Router.HandleFunc("/api/v1/addbook", a.AddBooksJSON).Methods("POST")
+	a.Router.HandleFunc("/listbooktable", a.ListBooksTable).Methods("GET")
 	a.Router.HandleFunc("/", a.ListBooks).Methods("GET")
 }
 
@@ -71,7 +72,15 @@ func (a *App) ListBooks(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/index.html", books)
 }
 
+func (a *App) ListBooksTable(w http.ResponseWriter, r *http.Request) {
+	// render(w, "templates/index.html", books)
+	http.ServeFile(w, r, "templates/vuetable.html")
+}
+
 func (a *App) ListBooksJSON(w http.ResponseWriter, r *http.Request) {
+	log.Println("CORS enabled for testing, remove in production")
+	(w).Header().Set("Access-Control-Allow-Origin", "*")
+
 	var books []book.DBBook
 	err := a.DB.All(&books)
 	if err != nil {
