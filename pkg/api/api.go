@@ -43,8 +43,8 @@ func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/deletebook/{id:[0-9]+}", a.DeleteBook).Methods("GET")
 	a.Router.HandleFunc("/api/v1/list", a.ListBooksJSON).Methods("GET")
 	a.Router.HandleFunc("/api/v1/addbook", a.AddBooksJSON).Methods("POST")
-	a.Router.HandleFunc("/listbooktable", a.ListBooksTable).Methods("GET")
-	a.Router.HandleFunc("/", a.ListBooks).Methods("GET")
+	a.Router.HandleFunc("/listbookold", a.ListBooks).Methods("GET")
+	a.Router.HandleFunc("/", a.ListBooksTable).Methods("GET")
 }
 
 func (a *App) Run(addr string) {

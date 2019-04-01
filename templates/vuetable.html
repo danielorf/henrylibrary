@@ -11,7 +11,12 @@
 <body>
 
     <div id="app">
-        <vue-good-table :rows="rows" :columns="columns" :search-options="{ enabled: true }" :pagination-options="{
+        <vue-good-table 
+        :rows="rows"
+        @on-row-click="onRowClick"
+        :columns="columns" 
+        :search-options="{ enabled: true }" 
+        :pagination-options="{
             enabled: true,
             perPage: 10
         }">
@@ -19,10 +24,11 @@
     </div>
 
     <script>
+        var URLBase = 'http://localhost:3000/'
         new Vue({
             el: "#app",
             mounted() {
-                fetch('http://localhost:3000/api/v1/list')
+                fetch(URLBase + 'api/v1/list')
                     .then(res => res.json())
                     .then(json => {
                         this.rows = json;
@@ -55,6 +61,11 @@
                 ],
                 rows: []
             }),
+            methods: {
+                onRowClick(params) {
+                    window.location.href = URLBase + 'updatebook/' + params.row.Pk
+                }
+            }
         });
     </script>
 </body>
