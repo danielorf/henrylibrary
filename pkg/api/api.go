@@ -79,6 +79,7 @@ func (a *App) ListBooksTable(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) ListBooksJSON(w http.ResponseWriter, r *http.Request) {
 	log.Println("CORS enabled for testing, remove in production")
+	// https://flaviocopes.com/golang-enable-cors/
 	(w).Header().Set("Access-Control-Allow-Origin", "*")
 
 	var books []book.DBBook
