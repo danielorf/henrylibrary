@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"text/template"
 	"time"
@@ -23,13 +22,12 @@ type App struct {
 }
 
 func (a *App) Initialize(dbname string) {
-	err := os.Remove(dbname) // Clear out old test db file
-
+	// err := os.Remove(dbname) // Clear out old test db file
+	var err error
 	a.DB, err = storm.Open(dbname, storm.Batch())
 	if err != nil {
 		fmt.Println(err)
 	}
-	// defer a.DB.Close()  Moved to Run()
 
 	a.Router = mux.NewRouter()
 	a.initializeRoutes()
@@ -43,7 +41,8 @@ func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/deletebook/{id:[0-9]+}", a.DeleteBook).Methods("GET")
 	a.Router.HandleFunc("/api/v1/list", a.ListBooksJSON).Methods("GET")
 	a.Router.HandleFunc("/api/v1/addbook", a.AddBooksJSON).Methods("POST")
-	a.Router.HandleFunc("/", a.ListBooks).Methods("GET")
+	a.Router.HandleFunc("/listbookold", a.ListBooks).Methods("GET")
+	a.Router.HandleFunc("/", a.ListBooksTable).Methods("GET")
 }
 
 func (a *App) Run(addr string) {
@@ -71,7 +70,16 @@ func (a *App) ListBooks(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/index.html", books)
 }
 
+func (a *App) ListBooksTable(w http.ResponseWriter, r *http.Request) {
+	// render(w, "templates/index.html", books)
+	http.ServeFile(w, r, "templates/vuetable.html")
+}
+
 func (a *App) ListBooksJSON(w http.ResponseWriter, r *http.Request) {
+	log.Println("CORS enabled for testing, remove in production")
+	// https://flaviocopes.com/golang-enable-cors/
+	(w).Header().Set("Access-Control-Allow-Origin", "*")
+
 	var books []book.DBBook
 	err := a.DB.All(&books)
 	if err != nil {
@@ -164,11 +172,11 @@ func render(w http.ResponseWriter, filename string, data interface{}) {
 
 func (a *App) FillSampleData() {
 	bookList := [][]string{
-		{"Where the Wild Things Are", "Maurice Sendak", "", ""},
-		{"Cat in the Hat", "Doctor Seuss", "", ""},
-		{"On the Road", "Jack Kerouac", "", ""},
-		{"Dictionary", "Steve", "", ""},
-		{"Quicksilver", "Neil Stephenson", "", ""},
+		{"Where the Wild Things Are", "Maurice Sendak", "boardback", "G&G"},
+		{"Cat in the Hat", "Doctor Seuss", "paperback", "Santa"},
+		{"On the Road", "Jack Kerouac", "paperback", "A time traveller"},
+		{"Dictionary", "Steve", "hardback", "Library"},
+		{"Quicksilver", "Neil Stephenson", "paperback", "Different time traveller"},
 	}
 	for _, elem := range bookList {
 		_ = a.addBook(elem[0], elem[1], elem[2], elem[3])

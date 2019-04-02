@@ -1,0 +1,73 @@
+<html>
+
+<head>
+    <title>Henry's Library</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vue-good-table@2.16.3/dist/vue-good-table.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-good-table@2.16.3/dist/vue-good-table.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
+</head>
+
+<body>
+
+    <div id="app">
+        <vue-good-table 
+        :rows="rows"
+        @on-row-click="onRowClick"
+        :columns="columns" 
+        :search-options="{ enabled: true }" 
+        :pagination-options="{
+            enabled: true,
+            perPage: 10
+        }">
+        </vue-good-table>
+    </div>
+
+    <script>
+        var URLBase = 'http://localhost:3000/'
+        new Vue({
+            el: "#app",
+            mounted() {
+                fetch(URLBase + 'api/v1/list')
+                    .then(res => res.json())
+                    .then(json => {
+                        this.rows = json;
+                    });
+            },
+            data: () => ({
+                columns: [
+                    {
+                        label: 'Title',
+                        field: 'Title',
+                    },
+                    {
+                        label: 'Author',
+                        field: 'Author'
+                    },
+                    {
+                        label: 'Binding',
+                        field: 'Binding'
+                    },
+                    {
+                        label: 'Source',
+                        field: 'Source'
+                    },
+                    {
+                        label: 'Date Added',
+                        field: 'DateAdded',
+                        type: 'date',
+                        formatFn: v=>moment(v).format(" MMMM Do YYYY")
+                    },
+                ],
+                rows: []
+            }),
+            methods: {
+                onRowClick(params) {
+                    window.location.href = URLBase + 'updatebook/' + params.row.Pk
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
