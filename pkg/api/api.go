@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"text/template"
 	"time"
@@ -23,13 +22,12 @@ type App struct {
 }
 
 func (a *App) Initialize(dbname string) {
-	err := os.Remove(dbname) // Clear out old test db file
-
+	// err := os.Remove(dbname) // Clear out old test db file
+	var err error
 	a.DB, err = storm.Open(dbname, storm.Batch())
 	if err != nil {
 		fmt.Println(err)
 	}
-	// defer a.DB.Close()  Moved to Run()
 
 	a.Router = mux.NewRouter()
 	a.initializeRoutes()
