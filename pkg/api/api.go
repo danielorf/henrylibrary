@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/asdine/storm"
-	"github.com/danielorf/henry_library/pkg/book"
+	"github.com/danielorf/henrylibrary/pkg/book"
 	"github.com/gorilla/mux"
 )
 
